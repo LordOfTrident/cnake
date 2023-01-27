@@ -13,7 +13,7 @@
 	</a>
 </p>
 
-### !CURRENT UNFINISHED!
+### !CURRENTLY UNFINISHED!
 
 A "fancy" snake game written in C using [SDL2](https://www.libsdl.org/), where the snake only has
 one eye (for some reason) and you eat cheese instead of apples.
