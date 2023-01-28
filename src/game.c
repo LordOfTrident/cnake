@@ -79,6 +79,16 @@ static void game_load_texture(struct game *g, int key, const char *path) {
 	SDL_Log("Loaded texture from '%s'", path);
 }
 
+static void game_load_sound(struct game *g, int key, const char *path) {
+	g->get_sound[key] = Mix_LoadWAV(path);
+	if (g->get_sound[key] == NULL) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	SDL_Log("Loaded sound from '%s'", path);
+}
+
 static size_t timer_times[TIMERS_COUNT] = {
 	[TIMER_SCR_SHAKE]  = SCR_SHAKE_TIME,
 	[TIMER_FADE_IN]    = FADE_IN_TIME,
@@ -102,6 +112,13 @@ static char *texture_paths[TEXTURES_COUNT] = {
 	[TEXTURE_SPACEBAR]  = ASSETS_FOLDER"/imgs/spacebar.png",
 };
 
+static char *sound_paths[SOUNDS_COUNT] = {
+	[SOUND_EAT]          = ASSETS_FOLDER"/sfx/eat.wav",
+	[SOUND_HIT]          = ASSETS_FOLDER"/sfx/hit.wav",
+	[SOUND_DEATH]        = ASSETS_FOLDER"/sfx/death.wav",
+	[SOUND_CHEESEBURGER] = ASSETS_FOLDER"/sfx/cheeseburger.wav",
+};
+
 static char *prefix_path(const char *path, const char *prefix) {
 	size_t size = strlen(prefix) + strlen(path) + 2;
 	char  *buf  = (char*)malloc(size);
@@ -114,6 +131,19 @@ static char *prefix_path(const char *path, const char *prefix) {
 	return buf;
 }
 
+static void game_load_font(struct game *g, const char *exec_folder_path) {
+	char *path = prefix_path(ASSETS_FOLDER"/fonts/deja_vu_sans.tff", exec_folder_path);
+
+	g->font = TTF_OpenFont(path, SCORE_FONT_SIZE * 2);
+	if (g->font == NULL) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	} else
+		SDL_Log("Loaded font from '%s'", path);
+
+	free(path);
+}
+
 static void game_load_assets(struct game *g) {
 	char  *exec_folder_path = get_exec_folder_path();
 
@@ -123,15 +153,13 @@ static void game_load_assets(struct game *g) {
 		free(path);
 	}
 
-	char *path = prefix_path(ASSETS_FOLDER"/fonts/deja_vu_sans.tff", exec_folder_path);
-	g->font = TTF_OpenFont(path, SCORE_FONT_SIZE * 2);
-	if (g->font == NULL) {
-		SDL_Log("%s", SDL_GetError());
-		exit(EXIT_FAILURE);
-	} else
-		SDL_Log("Loaded font from '%s'", path);
+	for (size_t i = 0; i < SOUNDS_COUNT; ++ i) {
+		char *path = prefix_path(sound_paths[i], exec_folder_path);
+		game_load_sound(g, i, path);
+		free(path);
+	}
 
-	free(path);
+	game_load_font(g, exec_folder_path);
 
 	free(exec_folder_path);
 }
@@ -177,6 +205,12 @@ void game_init(struct game *g) {
 		exit(EXIT_FAILURE);
 	} else
 		SDL_Log("Initialized SDL_ttf");
+
+	if (Mix_OpenAudio(MIX_DEFAULT_FREQUENCY, MIX_DEFAULT_FORMAT, MIX_DEFAULT_CHANNELS, 200) < 0) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	} else
+		SDL_Log("Initialized SDL_mixer");
 
 	g->win = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 	                          WIN_W, WIN_H, SDL_WINDOW_SHOWN);
@@ -244,6 +278,9 @@ void game_free_assets(struct game *g) {
 	for (size_t i = 0; i < TEXTURES_COUNT; ++ i)
 		SDL_DestroyTexture(g->get_texture[i].sdl);
 
+	for (size_t i = 0; i < SOUNDS_COUNT; ++ i)
+		Mix_FreeChunk(g->get_sound[i]);
+
 	SDL_DestroyTexture(g->score_texture.sdl);
 	TTF_CloseFont(g->font);
 }
@@ -265,6 +302,7 @@ void game_finish(struct game *g) {
 
 	SDL_Log("Finalized");
 
+	Mix_CloseAudio();
 	TTF_Quit();
 	IMG_Quit();
 	SDL_Quit();
@@ -527,9 +565,12 @@ void game_render(struct game *g) {
 }
 
 static void game_snake_change_dir(struct game *g, enum dir dir) {
-	if (g->state == STATE_TUTORIAL && !timer_active(&g->get_timer[TIMER_FADE_IN]))
+	if (g->state == STATE_TUTORIAL && !timer_active(&g->get_timer[TIMER_FADE_IN])) {
+		if (rand_irange(0, 10) == 0)
+			Mix_PlayChannel(1, g->get_sound[SOUND_CHEESEBURGER], 0);
+
 		game_fade_in(g);
-	else if (g->state == STATE_GAMEPLAY)
+	} else if (g->state == STATE_GAMEPLAY)
 		snake_change_dir(&g->snake, dir);
 }
 
@@ -670,6 +711,9 @@ static void game_update_gameplay(struct game *g) {
 	for (size_t i = 0; i < CHEESE_CAPACITY; ++ i) {
 		struct cheese *c = &g->cheese_pool.get[i];
 		if (c->at.x == prev_head_x && c->at.y == prev_head_y) {
+			if (g->snake.offset == 0)
+				Mix_PlayChannel(1, g->get_sound[SOUND_EAT], 0);
+
 			if (g->tick % 1 == 0)
 				cheese_bite(c);
 
@@ -692,6 +736,7 @@ static void game_update_gameplay(struct game *g) {
 			                             PARTICLES_ON_SHRINK);
 			timer_start(&g->get_timer[TIMER_SCR_SHAKE]);
 
+			Mix_PlayChannel(1, g->get_sound[SOUND_HIT], 0);
 			snake_shrink_to(&g->snake, i);
 			break;
 		}
@@ -701,6 +746,7 @@ static void game_update_gameplay(struct game *g) {
 		game_emit_snake_particles_at(g, prev_head_x, prev_head_y, PARTICLES_ON_SHRINK);
 		timer_start(&g->get_timer[TIMER_SCR_SHAKE]);
 
+		Mix_PlayChannel(1, g->get_sound[SOUND_DEATH], 0);
 		g->snake.dead = true;
 		g->state = STATE_DEAD;
 		timer_start(&g->get_timer[TIMER_DEAD]);

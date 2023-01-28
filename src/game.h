@@ -11,6 +11,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
+#include <SDL2/SDL_mixer.h>
 
 #include "common.h"
 #include "timer.h"
@@ -31,6 +32,15 @@ enum {
 	TEXTURE_SPACEBAR,
 
 	TEXTURES_COUNT,
+};
+
+enum {
+	SOUND_EAT = 0,
+	SOUND_HIT,
+	SOUND_DEATH,
+	SOUND_CHEESEBURGER,
+
+	SOUNDS_COUNT,
 };
 
 struct texture {
@@ -83,6 +93,7 @@ struct game {
 
 	struct timer   get_timer[TIMERS_COUNT];
 	struct texture get_texture[TEXTURES_COUNT];
+	Mix_Chunk     *get_sound[SOUNDS_COUNT];
 	TTF_Font      *font;
 };
 

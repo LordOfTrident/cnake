@@ -18,7 +18,7 @@ CFLAGS = -O2 -std=$(CSTD) -Wall -Wextra -Werror -pedantic -Wno-deprecated-declar
 LIBS   = -lm -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer
 
 $(OUT): $(BIN) $(OBJ) $(SRC)
-	cp -r ./res ./bin/cnake_assets
+	cp -r ./res/cnake_assets ./bin/
 	$(CC) $(CFLAGS) -o $(OUT) $(OBJ) $(LIBS)
 
 $(BIN)/%.o: src/%.c $(DEPS)
@@ -29,7 +29,7 @@ $(BIN):
 
 install: $(OUT)
 	cp $(OUT) $(INSTALL)
-	cp -r ./res $(INSTALL_FOLDER)/cnake_assets
+	cp -r ./res/cnake_assets $(INSTALL_FOLDER)/
 
 clean:
 	rm -r $(BIN)/*
