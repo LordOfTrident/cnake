@@ -11,6 +11,8 @@
 	<a href="https://github.com/LordOfTrident/cnake/pulls">
 		<img alt="GitHub pull requests" src="https://img.shields.io/github/issues-pr/LordOfTrident/cnake?color=4f79e4"/>
 	</a>
+	<br><br><br>
+	<img width="75%" src="res/thumbnail.png"/>
 </p>
 
 A "fancy" snake game written in C using [SDL2](https://www.libsdl.org/), where the snake only has
