@@ -68,12 +68,12 @@ static void game_load_texture(struct game *g, int key, const char *path) {
 	}
 
 	struct texture *texture = &g->get_texture[key];
-	texture->ptr = SDL_CreateTextureFromSurface(g->ren, s);
-	if (texture->ptr == NULL) {
+	texture->sdl = SDL_CreateTextureFromSurface(g->ren, s);
+	if (texture->sdl == NULL) {
 		SDL_Log("%s", SDL_GetError());
 		exit(EXIT_FAILURE);
 	}
-	SDL_QueryTexture(texture->ptr, NULL, NULL, &texture->w, &texture->h);
+	SDL_QueryTexture(texture->sdl, NULL, NULL, &texture->w, &texture->h);
 
 	SDL_FreeSurface(s);
 	SDL_Log("Loaded texture from '%s'", path);
@@ -87,52 +87,69 @@ static size_t timer_times[TIMERS_COUNT] = {
 	[TIMER_TRANSITION] = TRANSITION_TIME,
 };
 
+#define ASSETS_FOLDER "cnake_assets"
+
 static char *texture_paths[TEXTURES_COUNT] = {
-	[TEXTURE_EYES]      = "cnake_res/imgs/eyes.png",
-	[TEXTURE_EYES_DEAD] = "cnake_res/imgs/eyes_dead.png",
-	[TEXTURE_TONGUE]    = "cnake_res/imgs/tongue.png",
-	[TEXTURE_GRASS1]    = "cnake_res/imgs/grass1.png",
-	[TEXTURE_GRASS2]    = "cnake_res/imgs/grass2.png",
-	[TEXTURE_CHEESE]    = "cnake_res/imgs/cheese.png",
-	[TEXTURE_TUTORIAL]  = "cnake_res/imgs/tutorial.png",
-	[TEXTURE_PAUSED]    = "cnake_res/imgs/paused.png",
-	[TEXTURE_YOU_LOST]  = "cnake_res/imgs/you_lost.png",
-	[TEXTURE_SPACEBAR]  = "cnake_res/imgs/spacebar.png",
+	[TEXTURE_EYES]      = ASSETS_FOLDER"/imgs/eyes.png",
+	[TEXTURE_EYES_DEAD] = ASSETS_FOLDER"/imgs/eyes_dead.png",
+	[TEXTURE_TONGUE]    = ASSETS_FOLDER"/imgs/tongue.png",
+	[TEXTURE_GRASS1]    = ASSETS_FOLDER"/imgs/grass1.png",
+	[TEXTURE_GRASS2]    = ASSETS_FOLDER"/imgs/grass2.png",
+	[TEXTURE_CHEESE]    = ASSETS_FOLDER"/imgs/cheese.png",
+	[TEXTURE_TUTORIAL]  = ASSETS_FOLDER"/imgs/tutorial.png",
+	[TEXTURE_PAUSED]    = ASSETS_FOLDER"/imgs/paused.png",
+	[TEXTURE_YOU_LOST]  = ASSETS_FOLDER"/imgs/you_lost.png",
+	[TEXTURE_SPACEBAR]  = ASSETS_FOLDER"/imgs/spacebar.png",
 };
 
-static void game_load_textures(struct game *g) {
-	char  *path = get_exec_folder_path();
-	size_t len  = strlen(path);
+static char *prefix_path(const char *path, const char *prefix) {
+	size_t size = strlen(prefix) + strlen(path) + 2;
+	char  *buf  = (char*)malloc(size);
+	memset(buf, 0, size);
+
+	strcat(buf, prefix);
+	strcat(buf, "/");
+	strcat(buf, path);
+
+	return buf;
+}
+
+static void game_load_assets(struct game *g) {
+	char  *exec_folder_path = get_exec_folder_path();
+
 	for (size_t i = 0; i < TEXTURES_COUNT; ++ i) {
-		size_t size = strlen(texture_paths[i]) + len + 2;
-		char  *buf  = (char*)malloc(size);
-		memset(buf, 0, size);
-
-		strcat(buf, path);
-		strcat(buf, "/");
-		strcat(buf, texture_paths[i]);
-
-		game_load_texture(g, i, buf);
-
-		free(buf);
+		char *path = prefix_path(texture_paths[i], exec_folder_path);
+		game_load_texture(g, i, path);
+		free(path);
 	}
 
+	char *path = prefix_path(ASSETS_FOLDER"/fonts/deja_vu_sans.tff", exec_folder_path);
+	g->font = TTF_OpenFont(path, SCORE_FONT_SIZE * 2);
+	if (g->font == NULL) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	} else
+		SDL_Log("Loaded font from '%s'", path);
+
 	free(path);
+
+	free(exec_folder_path);
 }
 
 static void game_restart(struct game *g) {
 	g->darken_screen = true;
 	g->state         = STATE_TUTORIAL;
+	g->score         = 0;
 
 	struct snake_textures textures = {
-		.eyes      = g->get_texture[TEXTURE_EYES].ptr,
-		.eyes_dead = g->get_texture[TEXTURE_EYES_DEAD].ptr,
-		.tongue    = g->get_texture[TEXTURE_TONGUE].ptr,
+		.eyes      = g->get_texture[TEXTURE_EYES].sdl,
+		.eyes_dead = g->get_texture[TEXTURE_EYES_DEAD].sdl,
+		.tongue    = g->get_texture[TEXTURE_TONGUE].sdl,
 	};
 
 	SDL_Point start = {
 		.x = 5,
-		.y = COLS / 2,
+		.y = ROWS / 2,
 	};
 
 	snake_init(&g->snake, start, textures, SNAKE_COLOR_EXPAND);
@@ -154,6 +171,12 @@ void game_init(struct game *g) {
 		exit(EXIT_FAILURE);
 	} else
 		SDL_Log("Initialized SDL_image");
+
+	if (TTF_Init() < 0) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	} else
+		SDL_Log("Initialized SDL_ttf");
 
 	g->win = SDL_CreateWindow(TITLE, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 	                          WIN_W, WIN_H, SDL_WINDOW_SHOWN);
@@ -190,16 +213,22 @@ void game_init(struct game *g) {
 	} else
 		SDL_Log("Hint 'linear' for SDL_HINT_RENDER_SCALE_QUALITY was set");
 
+	if (SDL_RenderSetLogicalSize(g->ren, WIN_W, WIN_H) != 0) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	} else
+		SDL_Log("Render logical size was set");
+
 	g->keyboard = SDL_GetKeyboardState(NULL);
 
 	g->map_rect.x = WIN_W / 2 - MAP_W / 2;
-	g->map_rect.y = PADDING * 3 + INFO_H;
+	g->map_rect.y = PADDING * 2 + INFO_H;
 	g->map_rect.w = MAP_W;
 	g->map_rect.h = MAP_H;
 
-	game_load_textures(g);
+	game_load_assets(g);
 
-	SDL_Log("Loaded textures");
+	SDL_Log("Loaded assets");
 
 	particles_init(&g->particles);
 
@@ -211,12 +240,18 @@ void game_init(struct game *g) {
 	SDL_Log("Initialized");
 }
 
+void game_free_assets(struct game *g) {
+	for (size_t i = 0; i < TEXTURES_COUNT; ++ i)
+		SDL_DestroyTexture(g->get_texture[i].sdl);
+
+	SDL_DestroyTexture(g->score_texture.sdl);
+	TTF_CloseFont(g->font);
+}
+
 void game_finish(struct game *g) {
 	SDL_Log("--------------------------------");
 
-	for (size_t i = 0; i < TEXTURES_COUNT; ++ i)
-		SDL_DestroyTexture(g->get_texture[i].ptr);
-
+	game_free_assets(g);
 	SDL_Log("Destroyed assets");
 
 	SDL_DestroyTexture(g->map);
@@ -230,11 +265,12 @@ void game_finish(struct game *g) {
 
 	SDL_Log("Finalized");
 
+	TTF_Quit();
 	IMG_Quit();
 	SDL_Quit();
 }
 
-static void game_render_map(struct game *g) {
+static void game_render_map_grass(struct game *g) {
 	SDL_Rect r = {
 		.x = 0,
 		.y = 0,
@@ -253,7 +289,7 @@ static void game_render_map(struct game *g) {
 			r.x = x * RECT_SIZE;
 
 			SDL_RenderCopy(g->ren, g->get_texture[alt? TEXTURE_GRASS2 :
-			               TEXTURE_GRASS1].ptr, NULL, &r);
+			               TEXTURE_GRASS1].sdl, NULL, &r);
 		}
 	}
 
@@ -265,22 +301,14 @@ static void game_render_map(struct game *g) {
 	};
 
 	SDL_Rect h = v;
-	iswap(&h.w, &h.h);
+	h.h  = h.w;
+	h.w  = MAP_W;
 	h.x += SHADOW_OFFSET * 2;
 	h.w -= SHADOW_OFFSET * 2;
 
 	SDL_SetRenderDrawColor(g->ren, 0, 0, 0, SHADOW_ALPHA);
 	SDL_RenderFillRect(g->ren, &v);
 	SDL_RenderFillRect(g->ren, &h);
-}
-
-static void game_fade_out(struct game *g) {
-	g->darken_screen = true;
-	timer_start(&g->get_timer[TIMER_FADE_OUT]);
-}
-
-static void game_fade_in(struct game *g) {
-	timer_start(&g->get_timer[TIMER_FADE_IN]);
 }
 
 static void game_render_screen_fade(struct game *g) {
@@ -308,7 +336,67 @@ static void game_render_screen_fade(struct game *g) {
 	SDL_RenderFillRect(g->ren, &r);
 }
 
-static void game_render_transition(struct game *g) {
+static void game_render_tutorial_ui(struct game *g) {
+	game_render_screen_fade(g);
+
+	struct texture *texture = &g->get_texture[TEXTURE_TUTORIAL];
+	SDL_Rect r = {
+		.x = MAP_W / 2 - texture->w / 2,
+		.y = MAP_H - texture->h * 1.5 - sin((float)g->tick / 10) * 5,
+		.w = texture->w,
+		.h = texture->h,
+	};
+
+	SDL_RenderCopyShadow(g->ren, texture->sdl, NULL, &r, SHADOW_OFFSET, SHADOW_ALPHA);
+	SDL_RenderCopy(g->ren, texture->sdl, NULL, &r);
+}
+
+static void game_render_paused_ui(struct game *g) {
+	game_render_screen_fade(g);
+
+		struct texture *texture = &g->get_texture[TEXTURE_PAUSED];
+		SDL_Rect r = {
+			.x = MAP_W / 2 - texture->w / 2,
+			.y = MAP_H / 2 - texture->h / 2,
+			.w = texture->w,
+			.h = texture->h,
+		};
+
+		SDL_RenderCopyShadow(g->ren, texture->sdl, NULL, &r, SHADOW_OFFSET, SHADOW_ALPHA);
+		SDL_RenderCopy(g->ren, texture->sdl, NULL, &r);
+}
+
+static void game_render_dead_ui(struct game *g) {
+	if (!g->darken_screen)
+		return;
+
+	game_render_screen_fade(g);
+
+	struct texture *texture = &g->get_texture[TEXTURE_YOU_LOST];
+	SDL_Rect r = {
+		.x = MAP_W / 2 - texture->w / 2,
+		.y = texture->h * 2.5,
+		.w = texture->w,
+		.h = texture->h,
+	};
+
+	float angle = sin((float)g->tick / 20) * 3;
+
+	SDL_RenderCopyShadowEx(g->ren, texture->sdl, NULL, &r, angle, NULL, SDL_FLIP_NONE,
+	                       SHADOW_OFFSET, SHADOW_ALPHA);
+	SDL_RenderCopyEx(g->ren, texture->sdl, NULL, &r, angle, NULL, SDL_FLIP_NONE);
+
+	texture = &g->get_texture[TEXTURE_SPACEBAR];
+	r.x = MAP_W / 2 - texture->w / 2;
+	r.y = MAP_H - texture->h * 2.5 - sin((float)g->tick / 10) * 5;
+	r.w = texture->w;
+	r.h = texture->h;
+
+	SDL_RenderCopyShadow(g->ren, texture->sdl, NULL, &r, SHADOW_OFFSET, SHADOW_ALPHA);
+	SDL_RenderCopy(g->ren, texture->sdl, NULL, &r);
+}
+
+static void game_render_transition_ui(struct game *g) {
 	if (!timer_active(&g->get_timer[TIMER_TRANSITION]))
 		return;
 
@@ -325,15 +413,96 @@ static void game_render_transition(struct game *g) {
 	SDL_RenderFillRect(g->ren, &r);
 }
 
+static void game_render_ui(struct game *g) {
+	switch (g->state) {
+	case STATE_TUTORIAL: game_render_tutorial_ui(g); break;
+	case STATE_PAUSED:   game_render_paused_ui(g);   break;
+	case STATE_DEAD:     game_render_dead_ui(g);     break;
+	default: break;
+	}
+
+	game_render_transition_ui(g);
+}
+
+static void game_render_map(struct game *g) {
+	game_render_map_grass(g);
+	cheese_pool_render(&g->cheese_pool, g->get_texture[TEXTURE_CHEESE].sdl, g->ren);
+	snake_render(&g->snake, g->ren);
+	particles_render(&g->particles, g->ren);
+}
+
+static void game_fade_out(struct game *g) {
+	g->darken_screen = true;
+	timer_start(&g->get_timer[TIMER_FADE_OUT]);
+}
+
+static void game_fade_in(struct game *g) {
+	timer_start(&g->get_timer[TIMER_FADE_IN]);
+}
+
+static void game_render_create_score_texture(struct game *g) {
+	char text[16] = {0};
+	snprintf(text, sizeof(text), "%zu", g->score);
+	SDL_Color color = {
+		.r = 255,
+		.g = 255,
+		.b = 255,
+		.a = 200,
+	};
+	SDL_Surface *surface = TTF_RenderText_Solid(g->font, text, color);
+	if (surface == NULL) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	g->score_texture.sdl = SDL_CreateTextureFromSurface(g->ren, surface);
+	if (g->score_texture.sdl == NULL) {
+		SDL_Log("%s", SDL_GetError());
+		exit(EXIT_FAILURE);
+	}
+
+	g->score_texture.w = surface->w;
+	g->score_texture.h = surface->h;
+
+	SDL_FreeSurface(surface);
+}
+
+static void game_render_score(struct game *g) {
+	struct texture *texture = &g->get_texture[TEXTURE_CHEESE];
+	SDL_Rect r = {
+		.x = PADDING,
+		.y = PADDING,
+		.w = texture->w,
+		.h = texture->h,
+	};
+	SDL_RenderCopyShadow(g->ren, texture->sdl, NULL, &r, SHADOW_OFFSET / 1.5, SHADOW_ALPHA);
+	SDL_SetTextureAlphaMod(texture->sdl, 220);
+	SDL_RenderCopy(g->ren, texture->sdl, NULL, &r);
+	SDL_SetTextureAlphaMod(texture->sdl, 255);
+
+	if (g->prev_score != g->score || g->score_texture.sdl == NULL) {
+		SDL_DestroyTexture(g->score_texture.sdl);
+		game_render_create_score_texture(g);
+	}
+
+	r.x += r.w + 10;
+	r.y -= 2;
+	r.w  = g->score_texture.w / 2;
+	r.h  = g->score_texture.h / 2;
+	SDL_RenderCopyShadow(g->ren, g->score_texture.sdl, NULL, &r, SHADOW_OFFSET / 1.5, SHADOW_ALPHA);
+	SDL_RenderCopy(g->ren, g->score_texture.sdl, NULL, &r);
+}
+
 void game_render(struct game *g) {
 	SDL_SetRenderDrawColor(g->ren, BG_COLOR_EXPAND, SDL_ALPHA_OPAQUE);
 	SDL_RenderClear(g->ren);
 
+	SDL_RenderSetViewport(g->ren, NULL);
+
+	game_render_score(g);
+
 	SDL_SetRenderTarget(g->ren, g->map);
 	game_render_map(g);
-	cheese_pool_render(&g->cheese_pool, g->get_texture[TEXTURE_CHEESE].ptr, g->ren);
-	snake_render(&g->snake, g->ren);
-	particles_render(&g->particles, g->ren);
 	SDL_SetRenderTarget(g->ren, NULL);
 
 	SDL_RenderSetViewport(g->ren, &g->map_rect);
@@ -351,69 +520,9 @@ void game_render(struct game *g) {
 	r.x = g->map_shake_pos.x;
 	SDL_RenderCopy(g->ren, g->map, NULL, &r);
 
-	game_render_screen_fade(g);
-
-	switch (g->state) {
-	case STATE_TUTORIAL: {
-		struct texture *texture = &g->get_texture[TEXTURE_TUTORIAL];
-		SDL_Rect r = {
-			.x = MAP_W / 2 - texture->w / 2,
-			.y = MAP_H - texture->h * 1.5 - sin((float)g->tick / 10) * 5,
-			.w = texture->w,
-			.h = texture->h,
-		};
-
-		SDL_RenderCopyShadow(g->ren, texture->ptr, NULL, &r, SHADOW_OFFSET, SHADOW_ALPHA);
-		SDL_RenderCopy(g->ren, texture->ptr, NULL, &r);
-	} break;
-
-	case STATE_PAUSED: {
-		struct texture *texture = &g->get_texture[TEXTURE_PAUSED];
-		SDL_Rect r = {
-			.x = MAP_W / 2 - texture->w / 2,
-			.y = MAP_H / 2 - texture->h / 2,
-			.w = texture->w,
-			.h = texture->h,
-		};
-
-		SDL_RenderCopyShadow(g->ren, texture->ptr, NULL, &r, SHADOW_OFFSET, SHADOW_ALPHA);
-		SDL_RenderCopy(g->ren, texture->ptr, NULL, &r);
-	} break;
-
-	case STATE_DEAD: {
-		if (!g->darken_screen)
-			break;
-
-		struct texture *texture = &g->get_texture[TEXTURE_YOU_LOST];
-		SDL_Rect r = {
-			.x = MAP_W / 2 - texture->w / 2,
-			.y = texture->h * 4,
-			.w = texture->w,
-			.h = texture->h,
-		};
-
-		float angle = sin((float)g->tick / 20) * 3;
-
-		SDL_RenderCopyShadowEx(g->ren, texture->ptr, NULL, &r, angle, NULL, SDL_FLIP_NONE,
-		                       SHADOW_OFFSET, SHADOW_ALPHA);
-		SDL_RenderCopyEx(g->ren, texture->ptr, NULL, &r, angle, NULL, SDL_FLIP_NONE);
-
-		texture = &g->get_texture[TEXTURE_SPACEBAR];
-		r.x = MAP_W / 2 - texture->w / 2;
-		r.y = MAP_H - texture->h * 3 - sin((float)g->tick / 10) * 5;
-		r.w = texture->w;
-		r.h = texture->h;
-
-		SDL_RenderCopyShadow(g->ren, texture->ptr, NULL, &r, SHADOW_OFFSET, SHADOW_ALPHA);
-		SDL_RenderCopy(g->ren, texture->ptr, NULL, &r);
-	} break;
-
-	default: break;
-	}
-
-	game_render_transition(g);
-
+	game_render_ui(g);
 	SDL_RenderSetViewport(g->ren, NULL);
+
 	SDL_RenderPresent(g->ren);
 }
 
@@ -521,8 +630,90 @@ static bool game_get_new_cheese_pos(struct game *g, SDL_Point *ret) {
 	return false;
 }
 
+static void game_update_scr_shake(struct game *g) {
+	struct timer *shake = &g->get_timer[TIMER_SCR_SHAKE];
+
+	int shake_size = timer_unit(shake, false) * SCR_SHAKE_INTENSITY;
+	if (shake_size > 0) {
+		g->map_shake_pos.x = shake_size / 2 - rand() % shake_size;
+		g->map_shake_pos.y = shake_size / 2 - rand() % shake_size;
+	} else if (timer_just_ended(shake)) {
+		g->map_shake_pos.x = 0;
+		g->map_shake_pos.y = 0;
+	}
+}
+
+static bool game_spawn_cheese(struct game *g) {
+	size_t i;
+	for (i = 0; i < CHEESE_CAPACITY; ++ i) {
+		if (!g->cheese_pool.get[i].spawned)
+			break;
+	}
+
+	if (i >= CHEESE_CAPACITY)
+		UNREACHABLE("Cannot spawn any more cheese");
+
+	bool success = game_get_new_cheese_pos(g, &g->cheese_pool.get[i].at);
+	if (success)
+		g->cheese_pool.get[i].spawned = true;
+
+	return success;
+}
+
+static void game_update_gameplay(struct game *g) {
+	SDL_Point *head = g->snake.head;
+
+	int prev_head_x = head->x;
+	int prev_head_y = head->y;
+
+	struct cheese *cheese = NULL;
+	for (size_t i = 0; i < CHEESE_CAPACITY; ++ i) {
+		struct cheese *c = &g->cheese_pool.get[i];
+		if (c->at.x == prev_head_x && c->at.y == prev_head_y) {
+			if (g->tick % 1 == 0)
+				cheese_bite(c);
+
+			cheese = c;
+			break;
+		}
+	}
+
+	if (snake_move(&g->snake, SNAKE_SPEED)) {
+		if (cheese != NULL) {
+			cheese_eat(cheese);
+			snake_grow(&g->snake);
+			++ g->score;
+		}
+	}
+
+	for (size_t i = 1; i < g->snake.len; ++ i) {
+		if (g->snake.body[i].x == head->x && g->snake.body[i].y == head->y) {
+			game_emit_snake_particles_at(g, g->snake.body[i].x, g->snake.body[i].y,
+			                             PARTICLES_ON_SHRINK);
+			timer_start(&g->get_timer[TIMER_SCR_SHAKE]);
+
+			snake_shrink_to(&g->snake, i);
+			break;
+		}
+	}
+
+	if (head->x < 0 || head->x >= COLS || head->y < 0 || head->y >= ROWS) {
+		game_emit_snake_particles_at(g, prev_head_x, prev_head_y, PARTICLES_ON_SHRINK);
+		timer_start(&g->get_timer[TIMER_SCR_SHAKE]);
+
+		g->snake.dead = true;
+		g->state = STATE_DEAD;
+		timer_start(&g->get_timer[TIMER_DEAD]);
+	}
+
+	if (g->tick % CHEESE_SPAWN_TICK_DELAY == 0)
+		game_spawn_cheese(g);
+}
+
 void game_update(struct game *g) {
 	++ g->tick;
+	g->prev_score = g->score;
+
 	for (size_t i = 0; i < TIMERS_COUNT; ++ i) {
 		if (i == TIMER_SCR_SHAKE)
 			continue;
@@ -537,77 +728,10 @@ void game_update(struct game *g) {
 		particles_update(&g->particles);
 		snake_update(&g->snake);
 
-		if (g->state != STATE_DEAD) {
-			SDL_Point *head = g->snake.head;
+		if (g->state != STATE_DEAD)
+			game_update_gameplay(g);
 
-			int prev_head_x = head->x;
-			int prev_head_y = head->y;
-
-			struct cheese *cheese = NULL;
-			for (size_t i = 0; i < CHEESE_CAPACITY; ++ i) {
-				struct cheese *c = &g->cheese_pool.get[i];
-				if (c->at.x == prev_head_x && c->at.y == prev_head_y) {
-					if (g->tick % 1 == 0)
-						cheese_bite(c);
-
-					cheese = c;
-					break;
-				}
-			}
-
-			if (snake_move(&g->snake, SNAKE_SPEED)) {
-				if (cheese != NULL) {
-					cheese_eat(cheese);
-					snake_grow(&g->snake);
-				}
-			}
-
-			for (size_t i = 1; i < g->snake.len; ++ i) {
-				if (g->snake.body[i].x == head->x && g->snake.body[i].y == head->y) {
-					game_emit_snake_particles_at(g, g->snake.body[i].x, g->snake.body[i].y,
-					                             PARTICLES_ON_SHRINK);
-					timer_start(&g->get_timer[TIMER_SCR_SHAKE]);
-
-					snake_shrink_to(&g->snake, i);
-					break;
-				}
-			}
-
-			if (head->x < 0 || head->x >= COLS || head->y < 0 || head->y >= ROWS) {
-				game_emit_snake_particles_at(g, prev_head_x, prev_head_y, PARTICLES_ON_SHRINK);
-				timer_start(&g->get_timer[TIMER_SCR_SHAKE]);
-
-				g->snake.dead = true;
-				g->state = STATE_DEAD;
-				timer_start(&g->get_timer[TIMER_DEAD]);
-			}
-
-			if (g->tick % CHEESE_SPAWN_TICK_DELAY == 0) {
-				size_t i;
-				for (i = 0; i < CHEESE_CAPACITY; ++ i) {
-					if (!g->cheese_pool.get[i].spawned)
-						break;
-				}
-
-				if (i >= CHEESE_CAPACITY)
-					UNREACHABLE("Cannot spawn any more cheese");
-
-				bool success = game_get_new_cheese_pos(g, &g->cheese_pool.get[i].at);
-				if (success)
-					g->cheese_pool.get[i].spawned = true;
-			}
-		}
-
-		struct timer *shake = &g->get_timer[TIMER_SCR_SHAKE];
-
-		int shake_size = timer_unit(shake, false) * SCR_SHAKE_INTENSITY;
-		if (shake_size > 0) {
-			g->map_shake_pos.x = shake_size / 2 - rand() % shake_size;
-			g->map_shake_pos.y = shake_size / 2 - rand() % shake_size;
-		} else if (timer_just_ended(shake)) {
-			g->map_shake_pos.x = 0;
-			g->map_shake_pos.y = 0;
-		}
+		game_update_scr_shake(g);
 	}
 
 	if (timer_just_ended(&g->get_timer[TIMER_FADE_IN])) {

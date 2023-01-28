@@ -15,10 +15,10 @@ endif
 
 CC     = gcc
 CFLAGS = -O2 -std=$(CSTD) -Wall -Wextra -Werror -pedantic -Wno-deprecated-declarations
-LIBS   = -lm -lSDL2main -lSDL2 -lSDL2_image
+LIBS   = -lm -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer
 
 $(OUT): $(BIN) $(OBJ) $(SRC)
-	cp -r ./res ./bin/cnake_res
+	cp -r ./res ./bin/cnake_assets
 	$(CC) $(CFLAGS) -o $(OUT) $(OBJ) $(LIBS)
 
 $(BIN)/%.o: src/%.c $(DEPS)
@@ -29,7 +29,7 @@ $(BIN):
 
 install: $(OUT)
 	cp $(OUT) $(INSTALL)
-	cp -r ./res $(INSTALL_FOLDER)/cnake_res
+	cp -r ./res $(INSTALL_FOLDER)/cnake_assets
 
 clean:
 	rm -r $(BIN)/*

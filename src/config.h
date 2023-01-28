@@ -9,20 +9,22 @@
 
 #define RECT_SIZE 30
 
-#define ROWS 20
+#define ROWS 15
 #define COLS 20
 
 #define MAP_W (RECT_SIZE * COLS)
 #define MAP_H (RECT_SIZE * ROWS)
 
-#define PADDING 10
+#define PADDING 5
 
-#define INFO_H 100
+#define SCORE_FONT_SIZE 30
 
-#define WIN_W (MAP_W + PADDING * 2)
-#define WIN_H (MAP_H + PADDING * 4 + INFO_H)
+#define INFO_H SCORE_FONT_SIZE
 
-#define CHEESE_SPAWN_TICK_DELAY 200
+#define WIN_W (MAP_W)
+#define WIN_H (MAP_H + PADDING * 2 + INFO_H)
+
+#define CHEESE_SPAWN_TICK_DELAY 150
 
 #define SHADOW_OFFSET 5
 #define SHADOW_ALPHA  40
@@ -51,7 +53,7 @@
 
 #define DARKEN_SCR_ALPHA 110
 
-#define BG_COLOR_EXPAND     55,  60,  80
+#define BG_COLOR_EXPAND     66,  72,  82
 #define MAP_BG_COLOR_EXPAND 56,  149, 56
 #define SNAKE_COLOR_EXPAND  100, 100, 200
 

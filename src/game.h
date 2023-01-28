@@ -10,6 +10,7 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
+#include <SDL2/SDL_ttf.h>
 
 #include "common.h"
 #include "timer.h"
@@ -33,7 +34,7 @@ enum {
 };
 
 struct texture {
-	SDL_Texture *ptr;
+	SDL_Texture *sdl;
 	int w, h;
 };
 
@@ -70,6 +71,9 @@ struct game {
 	struct snake       snake;
 	struct cheese_pool cheese_pool;
 
+	size_t score, prev_score;
+	struct texture score_texture;
+
 	SDL_Texture *map;
 	SDL_Rect     map_rect;
 
@@ -79,6 +83,7 @@ struct game {
 
 	struct timer   get_timer[TIMERS_COUNT];
 	struct texture get_texture[TEXTURES_COUNT];
+	TTF_Font      *font;
 };
 
 void game_init(struct game *g);
