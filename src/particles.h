@@ -5,6 +5,7 @@
 
 #include <SDL2/SDL.h>
 
+#include "common.h"
 #include "timer.h"
 
 struct particle {

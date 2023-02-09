@@ -1,0 +1,1 @@
+{"author":"LordOfTrident","dependencies":[],"final":"cc .ypm\/*.o -o %B -lm -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -lSDL2_mixer","license":"GPL-3.0-or-later","name":"snake","run":"cc %S -c -o %B -O2 -std=gnu11 -Wall -Wextra -Werror -pedantic -Wno-deprecated-declarations","sourceFolder":"src","finalFile":"bin/app"}

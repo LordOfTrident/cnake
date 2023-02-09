@@ -18,6 +18,8 @@
 #endif
 
 #ifdef PLATFORM_WINDOWS
+#	include <windows.h>
+
 #	ifndef MAX_PATH
 #		define PATH_MAX 1024
 #	else
