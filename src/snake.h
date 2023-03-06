@@ -31,7 +31,7 @@ struct snake_textures {
 #define SNAKE_TONGUE_MIN_DELAY 300
 #define SNAKE_TONGUE_MAX_DELAY 600
 
-static_assert(SNAKE_TONGUE_MAX_DELAY > SNAKE_TONGUE_MIN_DELAY);
+static_assert(SNAKE_TONGUE_MAX_DELAY > SNAKE_TONGUE_MIN_DELAY, "");
 
 enum tongue_state {
 	TONGUE_HIDDEN = 0,

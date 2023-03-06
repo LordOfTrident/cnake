@@ -43,16 +43,22 @@ static char *get_exec_folder_path(void) {
 	else
 		strcpy(buf, argv[0]);
 #elif defined(PLATFORM_APPLE)
-	uint32_t size = PATH_MAX;
-	if (_NSGetExecutablePath(buffer, &size) != 0)
+	uint32_t len = PATH_MAX;
+	if (_NSGetExecutablePath(buf, &len) != 0)
 		strcpy(buf, argv[0]);
 #elif defined(PLATFORM_WINDOWS)
 	GetModuleFileName(NULL, buf, PATH_MAX);
-#elif defined(PLATFORM_UNIX) || defined(PLATFORM_UNKNOWN)
-	strcpy(buf, argv[0]);
+#else
+    strcpy(buf, argv[0]);
 #endif
-
-	for (size_t i = len - 1; i > 0; -- i) {
+#if defined(PLATFORM_LINUX)
+    ssize_t i = len - 1;
+#elif defined(PLATFORM_APPLE)
+    uint32_t i = len - 1;
+#elif defined(PLATFORM_WINDOWS)
+    size_t i = len - 1;
+#endif
+    for (; i > 0; -- i) {
 		if (buf[i] == '/' || buf[i] == '\\') {
 			buf[i] = '\0';
 			break;
