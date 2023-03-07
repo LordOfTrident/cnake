@@ -19,9 +19,16 @@ A "fancy" snake game written in C using [SDL2](https://www.libsdl.org/), where t
 one eye (for some reason) and you eat cheese instead of apples.
 
 ## Table of contents
+* [Prerequisites](#prerequisites)
 * [Quickstart](#quickstart)
 * [Bugs](#bugs)
 * [Make](#make)
+
+## Prerequisites
+Cnake requires the following dependencies to be installed globally:
+* [SDL2/SDL_image](https://github.com/libsdl-org/SDL_image)
+* [SDL2/SDL_ttf](https://github.com/libsdl-org/SDL_ttf)
+* [SDL2/SDL_mixer](https://github.com/libsdl-org/SDL_mixer)
 
 ## Quickstart
 ```sh
