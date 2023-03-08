@@ -1,0 +1,4 @@
+bin/
+
+compile_commands.json
+*.o
