@@ -49,16 +49,18 @@ static char *get_exec_folder_path(void) {
 #elif defined(PLATFORM_WINDOWS)
 	GetModuleFileName(NULL, buf, PATH_MAX);
 #else
-    strcpy(buf, argv[0]);
+	strcpy(buf, argv[0]);
 #endif
+
 #if defined(PLATFORM_LINUX)
-    ssize_t i = len - 1;
+	ssize_t i = len - 1;
 #elif defined(PLATFORM_APPLE)
-    uint32_t i = len - 1;
+	uint32_t i = len - 1;
 #elif defined(PLATFORM_WINDOWS)
-    size_t i = len - 1;
+	size_t i = len - 1;
 #endif
-    for (; i > 0; -- i) {
+
+	for (; i > 0; -- i) {
 		if (buf[i] == '/' || buf[i] == '\\') {
 			buf[i] = '\0';
 			break;
@@ -718,7 +720,7 @@ static void game_update_gameplay(struct game *g) {
 	struct cheese *cheese = NULL;
 	for (size_t i = 0; i < CHEESE_CAPACITY; ++ i) {
 		struct cheese *c = &g->cheese_pool.get[i];
-		if (c->at.x == prev_head_x && c->at.y == prev_head_y) {
+		if (c->spawned && c->at.x == prev_head_x && c->at.y == prev_head_y) {
 			if (g->snake.offset == 0)
 				Mix_PlayChannel(1, g->get_sound[SOUND_EAT], 0);
 
